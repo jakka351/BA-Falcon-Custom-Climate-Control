@@ -1,20 +1,19 @@
+///////////////////////////////////////////////////////////////////
+// Modifying Liam Gooch's BA Falcon HVAC reciever for use with FGI
 #include <SPI.h>
 #include "mcp2515_can.h"
-
+// Arduino SPI Chip Select & Interrupt Pin config
 const int SPI_CS_PIN = 10;
 const int CAN_INT_PIN = 2;
-
 mcp2515_can CAN(SPI_CS_PIN);
-
+//
 void setup()
 {
+  // initial serial baud rate
   Serial.begin(115200);
-
   //initialise CAN
-  while (!start())
-    ;
+  while (!start());
 }
-
 void loop()
 {
   //get serial in and process
@@ -24,7 +23,6 @@ void loop()
     //from CAN unit
     processSerialIn(sIn);
   }
-
   //process CAN data (from car)
   if (CAN_MSGAVAIL == CAN.checkReceive())
   { //check data incoming
@@ -35,11 +33,12 @@ void loop()
     processCANDataIn(canNodeID, buf);
   }
 }
-
 bool start()
 {
   //if CAN wiring OK - run the CAN BUS at 500KBPS
-  if (CAN_OK != CAN.begin(CAN_500KBPS))
+  // FG runs midspeed can @ 125 KBPS, however CAN IDS 353(HVAC Display Info) & 307(ICC Hvac Switches) are broadcast on both HS & MS can
+  // it is a better option to tee into the midspeed bus as a)the hscan contains the important stuff that shouldnt be tinkered with and b) access for the headunit wiring is easier
+  if (CAN_OK != CAN.begin(CAN_125KBPS)) //
   {
     Serial.print("FAIL");
     delay(100);
@@ -51,7 +50,6 @@ bool start()
     return true;
   }
 }
-
 void processSerialIn(String sIn)
 {
   // unsigned char[8] msg;
@@ -60,20 +58,17 @@ void processSerialIn(String sIn)
     unsigned char msg[8] = {0xB2, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
     sendCANMessage(0x353, msg);
   }
-
   if (sIn == "open_face_feet")
   {
     unsigned char msg[8] = {0x5A, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
     sendCANMessage(0x353, msg);
   }
 }
-
 void sendCANMessage(int id, unsigned char msg[8])
 {
   //sendMsgBuf(id (hex), 0, 8, data buf)
   CAN.sendMsgBuf(id, 0, 8, msg);
 }
-
 void processCANDataIn(unsigned long canNodeID, unsigned char buf[8])
 {
   if (canNodeID == 0x307)
